@@ -130,9 +130,9 @@ def process_product(
     product_dir = date_folder / title
     hdf_path = product_dir / f"{title}.HDF5"
 
-    if 200 and any(sz // 1024 ** 2 > memory for sz in deep_find_lengths(prod.geojson)):
-        return
-
+    if memory:
+        if any(sz // 1024 ** 2 > memory for sz in deep_find_lengths(prod.geojson)):
+            return
     try:
         cat.download_product(
             product=prod,
