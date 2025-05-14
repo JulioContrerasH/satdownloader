@@ -16,7 +16,7 @@ from typing import Callable
 @dataclass(frozen=True)
 class SensorCfg:
     collection_id: str
-    reader_factory: Callable[[pathlib.Path]]  # tipo base de tus readers
+    reader_factory: Callable[[pathlib.Path], object]
 
 SENSORS: dict[str, SensorCfg] = {
     "probav": SensorCfg(
@@ -25,7 +25,7 @@ SENSORS: dict[str, SensorCfg] = {
     ),
     "spot": SensorCfg(
         collection_id="urn:ogc:def:EOP:VITO:VGT_P",
-        reader_factory=spotvgt.SpotVGT,
+        reader_factory=lambda p: spotvgt.SpotVGT(p),
     ),
 }
 
@@ -118,17 +118,19 @@ def process_product(
     outdir: pathlib.Path,
     sensor: str,
     *,
+    cat: Catalogue | None = None,
     memory: None | int = None,
-    cat: Catalogue | None = None
 ) -> None:
     
+
     start = prod.beginningDateTime.strftime("%Y-%m-%d")
     outdir = pathlib.Path(outdir)
-    date_folder = outdir /"HDF5" / start
+    # date_folder = outdir /"HDF" / start
+    date_folder = outdir / "HDF" /start
     date_folder.mkdir(exist_ok=True, parents=True)
     title = prod.title
     product_dir = date_folder / title
-    hdf_path = product_dir / f"{title}.HDF5"
+
 
     if memory:
         if any(sz // 1024 ** 2 > memory for sz in deep_find_lengths(prod.geojson)):
@@ -144,6 +146,19 @@ def process_product(
         return
     
     cfg = SENSORS[sensor]
+
+
+    if sensor == "probav":
+        
+        hdf_path = product_dir / f"{title}.HDF5"
+
+    elif sensor == "spot":
+        change_directory = date_folder / "V003"
+        hdf_path = product_dir
+        change_directory.rename(hdf_path)
+        
+
+
     reader = cfg.reader_factory(hdf_path)
 
     data = reader.load_radiometry()  # shape (4, H, W)
@@ -163,16 +178,25 @@ def process_product(
     parts[-3] = "GeoTIFF"
     out_dir = pathlib.Path(*parts)
     out_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Remove out_dir
+
 
     # Transform
     base_transform = reader.transform
     total = len(c_runs)
 
     for idx, (x0, x1) in enumerate(c_runs, 1):
+        
         strip_basename = (
             f"{out_dir.name}_part{idx:02d}" if total > 1 else f"{out_dir.name}"
         )
-        out_file = out_dir / f"{strip_basename}.tif"
+        if sensor == "spot":
+            out_dir.rmdir()
+            out_file = out_dir.parent / f"{strip_basename}.tif"
+        if sensor == "probav":
+            out_file = out_dir / f"{strip_basename}.tif"
+
         if out_file.exists():
             continue
 
@@ -207,5 +231,6 @@ def download_image(
 
 
     for p in products:
+        
         process_product(p, outdir, sensor, cat=catalogue)
         print(f"Downloaded {p.title}")
