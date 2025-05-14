@@ -133,6 +133,7 @@ def process_product(
     if memory:
         if any(sz // 1024 ** 2 > memory for sz in deep_find_lengths(prod.geojson)):
             return
+
     try:
         cat.download_product(
             product=prod,
@@ -183,7 +184,7 @@ def process_product(
             base_transform
         )
         write_strip(out_file, strip, mstrip, strip_transform, reader.crs)
-        print(f"{idx}/{total} {strip_basename}")
+
 
 
 def download_image(
@@ -203,7 +204,8 @@ def download_image(
         end=end,
         geometry=f"POINT({lon} {lat})",
     )
-    products
+
+
     for p in products:
         process_product(p, outdir, sensor, cat=catalogue)
-
+        print(f"Downloaded {p.title}")
