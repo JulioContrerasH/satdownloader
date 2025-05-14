@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "geodownloader"
+version = "0.1.0"
+description = "Utility to download and process SPOT-VGT and PROBA-V scenes via Terracatalogue"
+authors = ["Julio Contreras <contrerasnetk@gmail.com>"]
+readme = "README.md"
+license = "MIT"
+packages = [
+  { include = "geodownloader" }
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+terracatalogueclient = "^0.1.0"
+georeader-spaceml = ">=1.5.2"
+rasterio = ">=1.3"
+numpy = ">=1.21"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
