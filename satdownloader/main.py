@@ -68,7 +68,7 @@ def deep_find_lengths(data) -> List[int]:
         return sum((deep_find_lengths(el) for el in data), [])
     return []
 
-def write_strip(
+def write_strip_image(
     out_file: pathlib.Path,
     pixel_data: np.ndarray,
     valid_mask: np.ndarray,
@@ -100,6 +100,39 @@ def write_strip(
     with rio.open(out_file, "w", **meta) as dst:
         dst.write(pixel_data)
 
+def write_strip_initial(
+    out_file: pathlib.Path,
+    pixel_data: np.ndarray,
+    valid_mask: np.ndarray,
+    transform: Affine,
+    crs: str | dict,
+) -> None:
+    """Save *pixel_data* (C, H, W) as a single‑strip COG."""
+    pixel_data = pixel_data[np.newaxis, ...]
+    bands, rows, cols = pixel_data.shape
+    pixel_data = pixel_data.astype("uint8", copy=False)
+    pixel_data[:,~valid_mask] = 0  # apply mask in‑place
+
+    meta = dict(
+        driver="GTiff",
+        dtype="uint8",
+        tiled=True,
+        blockxsize=512,
+        blockysize=512,
+        interleave="band",
+        compress="ZSTD",
+        predictor=2,
+        bigtiff="IF_SAFER",
+        nodata=0,
+        height=rows,
+        width=cols,
+        count=bands,
+        crs=crs,
+        transform=transform,
+    )
+    with rio.open(out_file, "w", **meta) as dst:
+        dst.write(pixel_data)
+
 def process_product(
     prod: Product,
     outdir: pathlib.Path,
@@ -112,7 +145,6 @@ def process_product(
 
     start = prod.beginningDateTime.strftime("%Y-%m-%d")
     outdir = pathlib.Path(outdir)
-    # date_folder = outdir /"HDF" / start
     date_folder = outdir / "HDF" /start
     date_folder.mkdir(exist_ok=True, parents=True)
     title = prod.title
@@ -149,6 +181,7 @@ def process_product(
 
     data = reader.load_radiometry()  # shape (4, H, W)
     mask = reader.load_mask()        # shape (H, W)
+    initial_mask = reader.load_sm_cloud_mask()
 
     # find valid rows / columns
     r_runs = row_runs(mask)
@@ -170,22 +203,40 @@ def process_product(
     total = len(c_runs)
 
     for idx, (x0, x1) in enumerate(c_runs, 1):
-
+          
         out_file = pathlib.Path(
-            f"{out_dir / title}_part{idx:02d}" if total > 1 else f"{out_dir / (title +'.tif')}"
+            f"{out_dir / title}_part{idx:02d}.tif" if total > 1 else f"{out_dir / (title +'.tif')}"
         )
-
-        if out_file.exists():
+        out_file_initial = pathlib.Path(
+            f"{out_dir / title}_part{idx:02d}_initial.tif" if total > 1 else f"{out_dir / (title +'_initial.tif')}"
+        )
+        
+        if out_file.exists() and out_file_initial.exists():
             continue
 
         strip = data.values[:, y0:y1, x0:x1]
+        strip_initial = initial_mask.values[y0:y1, x0:x1]
         mstrip = mask.values[y0:y1, x0:x1]
 
         # Change transform to strip coordinates
         strip_transform = Affine.translation(x0 * base_transform.a, y0 * base_transform.e) * (
             base_transform
         )
-        write_strip(out_file, strip, mstrip, strip_transform, reader.crs)
+        write_strip_image(
+            out_file = out_file, 
+            pixel_data = strip, 
+            valid_mask = mstrip, 
+            transform = strip_transform, 
+            crs = reader.crs
+        )
+        write_strip_initial(
+            out_file = out_file_initial, 
+            pixel_data = strip_initial, 
+            valid_mask = mstrip, 
+            transform = strip_transform, 
+            crs = reader.crs
+        )
+
 
 def download_image(
     catalogue: Catalogue,
@@ -216,5 +267,9 @@ def download_image(
 
     for p in products:
         
-        process_product(p, outdir, sensor, cat=catalogue)
+        process_product(prod = p, 
+                        outdir = outdir, 
+                        sensor = sensor,
+                        cat=catalogue
+                        )
         print(f"Downloaded {p.title}")
