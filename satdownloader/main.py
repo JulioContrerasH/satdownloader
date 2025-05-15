@@ -218,19 +218,3 @@ def download_image(
         
         process_product(p, outdir, sensor, cat=catalogue)
         print(f"Downloaded {p.title}")
-
-
-catalogue = Catalogue().authenticate_non_interactive(
-    username="jcontreras", 
-    password="mF*4wcykY_qXKRH"
-)
-
-download_image(
-    catalogue=catalogue,
-    sensor = "spot",
-    lon = -75,
-    lat = -11,
-    start = "2014-01-14",
-    end = "2014-01-16",
-    outdir = "data"
-)
