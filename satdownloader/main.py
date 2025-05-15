@@ -4,7 +4,7 @@ import pathlib
 from typing import List, Tuple
 
 import numpy as np
-import rasterio
+import rasterio as rio
 from rasterio.transform import Affine
 from terracatalogueclient import Catalogue, Product, ProductFileType
 from georeader.readers import probav_image_operational as probav
@@ -18,7 +18,7 @@ class SensorCfg:
     collection_id: str
     reader_factory: Callable[[pathlib.Path], object]
 
-SENSORS: dict[str, SensorCfg] = {
+SENSORS = {
     "probav": SensorCfg(
         collection_id="urn:eop:VITO:PROBAV_L2A_1KM_HDF_V2",
         reader_factory=lambda p: probav.ProbaV(p, level_name="LEVEL2A"),
@@ -107,7 +107,7 @@ def write_strip(
         crs=crs,
         transform=transform,
     )
-    with rasterio.open(out_file, "w", **meta) as dst:
+    with rio.open(out_file, "w", **meta) as dst:
         dst.write(pixel_data)
 
 
@@ -209,26 +209,32 @@ def process_product(
         )
         write_strip(out_file, strip, mstrip, strip_transform, reader.crs)
 
-
-
 def download_image(
     catalogue: Catalogue,
     sensor: str,
-    lon: float,
-    lat: float,
     start: str,
     end: str,
-    outdir: str
+    *,
+    outdir: str = "data",
+    lon: float | None = None,
+    lat: float | None = None,
     ) -> None:
     
     cfg = SENSORS[sensor]
-    products = catalogue.get_products(
-        collection=cfg.collection_id,
-        start=start,
-        end=end,
-        geometry=f"POINT({lon} {lat})",
-    )
 
+    if (not lon is None) and (not lat is None): 
+        products = catalogue.get_products(
+            collection=cfg.collection_id,
+            start=start,
+            end=end,
+            geometry=f"POINT({lon} {lat})",
+        )
+    else:
+        products = catalogue.get_products(
+            collection=cfg.collection_id,
+            start=start,
+            end=end,
+        )
 
     for p in products:
         
