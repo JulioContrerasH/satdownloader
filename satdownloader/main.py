@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pathlib
-from typing import List, Tuple
+from typing import List, Tuple, Callable
 
 import numpy as np
 import rasterio as rio
@@ -10,8 +10,6 @@ from terracatalogueclient import Catalogue, Product, ProductFileType
 from georeader.readers import probav_image_operational as probav
 from georeader.readers import spotvgt_image_operational as spotvgt
 from dataclasses import dataclass
-from typing import Callable
-
 
 @dataclass(frozen=True)
 class SensorCfg:
@@ -29,9 +27,6 @@ SENSORS = {
     ),
 }
 
-
-# ─────────────────────────────── helper functions ────────────────────────────
-
 def _runs_1d(vec: np.ndarray, *, min_len: int) -> List[Tuple[int, int]]:
     """Return (start, end) indices of True runs of length ≥ *min_len*."""
     runs: list[Tuple[int, int]] = []
@@ -48,24 +43,20 @@ def _runs_1d(vec: np.ndarray, *, min_len: int) -> List[Tuple[int, int]]:
         runs.append((start, len(vec)))
     return runs
 
-
 def _ensure_2d(arr: np.ndarray) -> np.ndarray:
     if arr.ndim != 2:
         raise ValueError(f"Expected 2‑D (rows, cols), got {arr.shape}")
     return arr
-
 
 def column_runs(mask, *, min_cols: int = 256) -> List[Tuple[int, int]]:
     """Contiguous valid‑column runs."""
     m = _ensure_2d(mask.values if hasattr(mask, "values") else np.asarray(mask))
     return _runs_1d(m.any(axis=0), min_len=min_cols)
 
-
 def row_runs(mask, *, min_rows: int = 32) -> List[Tuple[int, int]]:
     """Contiguous valid‑row runs."""
     m = _ensure_2d(mask.values if hasattr(mask, "values") else np.asarray(mask))
     return _runs_1d(m.any(axis=1), min_len=min_rows)
-
 
 def deep_find_lengths(data) -> List[int]:
     """Collect every 'length' value inside any nested structure."""
@@ -76,7 +67,6 @@ def deep_find_lengths(data) -> List[int]:
     if isinstance(data, list):
         return sum((deep_find_lengths(el) for el in data), [])
     return []
-
 
 def write_strip(
     out_file: pathlib.Path,
@@ -110,9 +100,6 @@ def write_strip(
     with rio.open(out_file, "w", **meta) as dst:
         dst.write(pixel_data)
 
-
-# ───────────────────────────── processing pipeline ───────────────────────────
-
 def process_product(
     prod: Product,
     outdir: pathlib.Path,
@@ -130,7 +117,6 @@ def process_product(
     date_folder.mkdir(exist_ok=True, parents=True)
     title = prod.title
     product_dir = date_folder / title
-
 
     if memory:
         if any(sz // 1024 ** 2 > memory for sz in deep_find_lengths(prod.geojson)):
@@ -172,30 +158,22 @@ def process_product(
     
     # find the first valid row
     y0, y1 = r_runs[0]
+
     parts = list(product_dir.parts)
 
-    # Path to the GeoTIFF output
-    parts[-3] = "GeoTIFF"
-    out_dir = pathlib.Path(*parts)
+    
+    out_dir = pathlib.Path(*(parts[:1] + ["GeotTiFF"]))
     out_dir.mkdir(parents=True, exist_ok=True)
     
-    # Remove out_dir
-
-
     # Transform
     base_transform = reader.transform
     total = len(c_runs)
 
     for idx, (x0, x1) in enumerate(c_runs, 1):
-        
-        strip_basename = (
-            f"{out_dir.name}_part{idx:02d}" if total > 1 else f"{out_dir.name}"
+
+        out_file = pathlib.Path(
+            f"{out_dir / title}_part{idx:02d}" if total > 1 else f"{out_dir / (title +'.tif')}"
         )
-        if sensor == "spot":
-            out_dir.rmdir()
-            out_file = out_dir.parent / f"{strip_basename}.tif"
-        if sensor == "probav":
-            out_file = out_dir / f"{strip_basename}.tif"
 
         if out_file.exists():
             continue
@@ -240,3 +218,19 @@ def download_image(
         
         process_product(p, outdir, sensor, cat=catalogue)
         print(f"Downloaded {p.title}")
+
+
+catalogue = Catalogue().authenticate_non_interactive(
+    username="jcontreras", 
+    password="mF*4wcykY_qXKRH"
+)
+
+download_image(
+    catalogue=catalogue,
+    sensor = "spot",
+    lon = -75,
+    lat = -11,
+    start = "2014-01-14",
+    end = "2014-01-16",
+    outdir = "data"
+)
