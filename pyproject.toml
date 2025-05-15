@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "satdownloader"
+name = "satility"
 version = "0.1.0"
 description = "Utility to download and process SPOT-VGT and PROBA-V scenes via Terracatalogue"
 authors = ["Julio Contreras <contrerasnetk@gmail.com>"]
 readme = "README.md"
 license = "MIT"
 packages = [
-  { include = "satdownloader" }
+  { include = "satility" }
 ]
 
 [tool.poetry.dependencies]
