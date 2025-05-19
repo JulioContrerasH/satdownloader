@@ -15,7 +15,7 @@ class MetaModel(nn.Module):
             nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
             nn.Conv2d(4, 1, 1),                       # sin Sigmoid
-            # nn.Sigmoid()                             # [B,1,H,W]
+            nn.Sigmoid()                             # [B,1,H,W]
         )
 
     def forward(self, x):

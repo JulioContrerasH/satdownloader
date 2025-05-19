@@ -82,7 +82,11 @@ def process_product(
             f"{out_dir / title}_part{idx:02d}.tif" if total > 1 else f"{out_dir / (title +'.tif')}"
         )
         out_file_initial = pathlib.Path(
-            f"{out_dir / title}_part{idx:02d}_initial.tif" if total > 1 else f"{out_dir / (title +'_initial.tif')}"
+            f"{out_dir / title}_part{idx:02d}_initial_mask.tif" if total > 1 else f"{out_dir / (title +'_initial_mask.tif')}"
+        )
+
+        out_file_valid = pathlib.Path(
+            f"{out_dir / title}_part{idx:02d}_valid_mask.tif" if total > 1 else f"{out_dir / (title +'_valid_mask.tif')}"
         )
         
         if out_file.exists() and out_file_initial.exists():
@@ -90,6 +94,7 @@ def process_product(
 
         strip = data.values[:, y0:y1, x0:x1]
         strip_initial = initial_mask.values[y0:y1, x0:x1]
+        strip_valid = mask.values[y0:y1, x0:x1]
         mstrip = mask.values[y0:y1, x0:x1]
 
         # Change transform to strip coordinates
@@ -106,6 +111,13 @@ def process_product(
         write_strip_initial(
             out_file = out_file_initial, 
             pixel_data = strip_initial, 
+            valid_mask = mstrip, 
+            transform = strip_transform, 
+            crs = reader.crs
+        )
+        write_strip_initial(
+            out_file = out_file_valid, 
+            pixel_data = strip_valid, 
             valid_mask = mstrip, 
             transform = strip_transform, 
             crs = reader.crs

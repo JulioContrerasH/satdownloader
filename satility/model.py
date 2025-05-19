@@ -11,12 +11,12 @@ from torch.nn.modules.utils import consume_prefix_in_state_dict_if_present
 
 
 def load_model(
-        ckpt_path: pathlib.Path | str | None = None,
+        ckpt_path: pathlib.Path | str | bool = False,
         *, 
         mode: str = "none",
         device: str = "cpu"
     ) -> torch.nn.Module:
-
+    
 
     if not ckpt_path:
         model = load_ensemble(
@@ -144,9 +144,10 @@ def predict(
                 response_model = cloud_model(patch_tensor) 
                 if isinstance(response_model, tuple):
                     probs, uncer = response_model  # (1,1,H,W)
+       
                 else:
-                    logits = response_model # (1,1,H,W)
-                    probs = torch.sigmoid(logits)
+                    probs = response_model # (1,1,H,W)
+                    # probs = torch.sigmoid(logits)
                     uncer = None
 
             if uncer is not None:
